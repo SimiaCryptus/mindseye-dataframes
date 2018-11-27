@@ -36,6 +36,7 @@ import com.simiacryptus.sparkbook._
 import com.simiacryptus.sparkbook.repl.{SparkRepl, SparkSessionProvider}
 import com.simiacryptus.sparkbook.util.Java8Util._
 import com.simiacryptus.sparkbook.util.Logging
+import org.apache.spark.sql.types.{IntegerType, StringType}
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.storage.StorageLevel
 
@@ -64,28 +65,35 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
 
     log.h1("Data Staging")
     log.p("""First, we will stage the initial data and manually perform a data staging query:""")
+    val inputTables : List[DataFrame] = log.eval(() => {
+      dataSources.map(t => {
+        val (k, v) = t
+        val frame = spark.sqlContext.read.parquet(k).persist(StorageLevel.DISK_ONLY)
+        frame.createOrReplaceTempView(v)
+        println(s"Loaded ${frame.count()} rows to ${v}")
+        frame
+      }).toList
+    })
+    val selectStr = inputTables.head.schema.fields.map(field => {
+      field.dataType match {
+        case IntegerType if("Cover_Type" == field.name) => field.name
+        case IntegerType => s"CAST(${field.name} AS DOUBLE)"
+        case _ => field.name
+      }
+    }).mkString(", \n\t")
+
     new SparkRepl() {
 
       override val defaultCmd: String =
         s"""%sql
            | CREATE TEMPORARY VIEW ${sourceTableName} AS
-           | SELECT * FROM ${dataSources.values.head}
+           | SELECT $selectStr FROM ${dataSources.values.head}
         """.stripMargin.trim
 
       override def shouldContinue(): Boolean = {
         sourceDataFrame == null
       }
 
-      override def init(): Unit = {
-        log.run(() => {
-          dataSources.foreach(t => {
-            val (k, v) = t
-            val frame = spark.sqlContext.read.parquet(k).persist(StorageLevel.DISK_ONLY)
-            frame.createOrReplaceTempView(v)
-            println(s"Loaded ${frame.count()} rows to ${v}")
-          })
-        })
-      }
     }.apply(log)
 
     log.p("""This sub-report can be used for concurrent adhoc data exploration:""")
@@ -99,7 +107,7 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
       null
     })
 
-    val Array(trainingData, testingData) = sourceDataFrame.randomSplit(Array(0.05, 0.95))
+    val Array(trainingData, testingData) = sourceDataFrame.randomSplit(Array(0.1, 0.9))
     trainingData.persist(StorageLevel.MEMORY_ONLY_SER)
     log.h1("""Table Schema""")
     log.run(() => {

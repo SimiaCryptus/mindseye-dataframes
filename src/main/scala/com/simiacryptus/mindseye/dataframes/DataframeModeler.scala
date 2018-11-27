@@ -15,7 +15,7 @@ import com.simiacryptus.sparkbook.util.Java8Util._
 import com.simiacryptus.sparkbook.util.Logging
 import com.simiacryptus.util.ArrayUtil
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types.{DataType, IntegerType, StringType, StructType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row}
 
 import scala.collection.JavaConverters._
@@ -32,7 +32,7 @@ final case class DataframeModeler
   def initLayer(value: String): Tensor = {
     require(null != value)
     val id = UUID.nameUUIDFromBytes(value.getBytes("UTF-8"))
-    //logger.info(s"Initialize value for $value = $id")
+    logger.info(s"Initialize value for $value = $id")
     val hashCode = hash(value)
     val seeded = new Random(hashCode.asLong())
     val initData = new Tensor(DataframeModeler.this.size(this, value): _*)
@@ -55,33 +55,40 @@ final case class DataframeModeler
 
   def getResult(values: Seq[Any]): (Result, Seq[(String, String)]) = {
     require(null != values)
-    val tensors = values.map(value => {
+    val layer = new ValueLayer(values.map(value => {
       get(valueStr(value))
-    })
-    new ValueLayer(tensors: _*).eval() -> values.map(value => path -> value.toString)
+    }): _*)
+    val result = layer.eval()
+    layer.freeRef()
+    result -> values.map(value => path -> value.toString)
   }
 
   def get(key: String) = {
     require(null != key)
-    representationVectors.synchronized {
-      val tensor = representationVectors.getOrElseUpdate(key, this.initLayer(key))
-      require(null != tensor)
-      tensor
-    }
+    representationVectors.getOrElseUpdate(key, this.initLayer(key))
   }
 
 
   def convert(field: DataType, data: Seq[_]): (Result, Seq[(String, String)]) = {
-    (field, data) match {
-      case (struct: StructType, row: Seq[_]) =>
-        val tuples: Array[(Result, Seq[(String, String)])] = struct.fields.map(f => {
-          child(f.name).convert(f.dataType, row.map(_.asInstanceOf[Row].getAs[Object](f.name)))
+    field match {
+      case struct: StructType =>
+        val tuples: Array[(Result, Seq[(String, String)])] = struct.fields.zipWithIndex.map(t => {
+          val (f,i) = t
+          child(f.name).convert(f.dataType, data.map(_.asInstanceOf[Row].get(i)))
         })
-        new TensorConcatLayer().eval(tuples.map(_._1): _*) -> tuples.flatMap(_._2)
-      case (_: IntegerType, row: Seq[_]) =>
-        this.getResult(row)
-      case (_: StringType, row: Seq[_]) =>
-        this.getResult(row)
+        val layer = new TensorConcatLayer()
+        val result = layer.evalAndFree(tuples.map(_._1): _*)
+        layer.freeRef()
+        result -> tuples.flatMap(_._2)
+      case _: DoubleType =>
+        new ConstantResult(TensorArray.wrap(data.map({
+          case n:Number => n.doubleValue()
+          case s:Any => s.toString.toDouble
+        }).map(new Tensor(_)).toArray:_*)) -> Seq.empty
+      case _: IntegerType =>
+        this.getResult(data)
+      case _: StringType =>
+        this.getResult(data)
     }
   }
 
@@ -96,21 +103,39 @@ final case class DataframeModeler
   }
 
   def evalLocal(dataFrames: DataFrame*)(layers: Layer*) = {
-    val translated: Seq[(Result, Seq[(String, String)])] = dataFrames.map(data => {
+    val translated = dataFrames.map(data => {
       val schema = data.schema
-      DataframeModeler.this.convert(schema, data.rdd.collect())
+      data.rdd.collect().grouped(10000).map(rows => {
+        DataframeModeler.this.convert(schema, rows)
+      }).toList
     })
-    val keys = translated.flatMap(_._2).distinct.sorted.toList
-    val postNetwork = layers.foldLeft(translated.map(_._1))((a: Seq[Result], b: Layer) => {
-      val result = b.eval(a: _*)
-      a.foreach(_.freeRef())
-      Seq(result)
-    }).head
-    require(postNetwork.getData.length() == 1)
-    new Result(postNetwork.getData, new BiConsumer[DeltaSet[UUID], TensorList] {
+    val keys = translated.flatMap(_.flatMap(_._2).distinct).distinct.sorted.toList
+    val unitFeedback = new Tensor(-1.0)
+    val deltaResults: Seq[(TensorList, Map[UUID, Array[Double]])] = translated
+      .map(_.map(_._1))
+      .map(_.map(List(_)))
+      .reduce(_.zip(_).map(t => t._1 ++ t._2))
+      .map(inputs => {
+        val result = layers.foldLeft(inputs)((a: Seq[Result], b: Layer) => List(b.evalAndFree(a: _*))).head
+        val tuple = (result.getData, evalFeedback(unitFeedback)(result))
+        result.freeRef()
+        tuple
+      })
+    def sum(a: TensorList): Tensor = (0 until a.length()).map(a.get(_)).reduce(_.add(_))
+    val summedResults: TensorList = deltaResults.map(_._1).reduce((a, b) => {
+      val sumB = sum(b)
+      val tensorArray = TensorArray.wrap(sum(a).addAndFree(sumB))
+      sumB.freeRef()
+      a.freeRef()
+      b.freeRef()
+      tensorArray
+    })
+    val uuidToDoubles = deltaResults.flatMap(_._2).groupBy(_._1).mapValues(_.map(_._2).reduce(ArrayUtil.add(_, _)))
+    unitFeedback.freeRef()
+    new Result(summedResults, new BiConsumer[DeltaSet[UUID], TensorList] {
       override def accept(buffer: DeltaSet[UUID], signal: TensorList): Unit = {
-        if (signal.length() > 1) throw new IllegalArgumentException(s"signal.length() = ${signal.length()}")
-        evalFeedback(signal.get(0))(postNetwork).foreach(accumulate(buffer, layers, keys)(_))
+        if (signal.length() > 1) throw new IllegalArgumentException
+        uuidToDoubles.foreach(accumulate(buffer, layers, keys))
       }
     })
   }
@@ -123,18 +148,20 @@ final case class DataframeModeler
       }).cache()
     })
     val keys = translated.flatMap(_.flatMap(_._2).distinct().collect()).distinct.sorted.toList
-    val postNetwork: RDD[Result] = translated.map(_.map(_._1)).map(_.map(t => List(t))).reduce(_.zip(_).map(t => t._1 ++ t._2)).map(inputs => {
-      layers.foldLeft(inputs)((a: Seq[Result], b: Layer) => List(b.eval(a: _*))).head
-    }).cache()
-
+    val postNetwork: RDD[Result] = translated
+      .map(_.map(_._1))
+      .map(_.map(t => List(t)))
+      .reduce(_.zip(_).map(t => t._1 ++ t._2))
+      .map(inputs => layers.foldLeft(inputs)((a: Seq[Result], b: Layer) => List(b.eval(a: _*))).head)
+      .cache()
     def sum(a: TensorList): Tensor = (0 until a.length()).map(a.get(_)).reduce(_.add(_))
-
     val summedResults: TensorList = postNetwork.map(_.getData).reduce((a, b) => TensorArray.create(sum(a).add(sum(b))))
     translated.foreach(_.unpersist())
     new Result(summedResults, new BiConsumer[DeltaSet[UUID], TensorList] {
       override def accept(buffer: DeltaSet[UUID], signal: TensorList): Unit = {
         if (signal.length() > 1) throw new IllegalArgumentException
         postNetwork.flatMap(evalFeedback(signal.get(0))).groupBy(_._1).mapValues(_.map(_._2).reduce(ArrayUtil.add(_, _))).collect().foreach(accumulate(buffer, layers, keys))
+        signal.freeRef()
       }
     }) {
       override protected def _free(): Unit = {
@@ -145,7 +172,6 @@ final case class DataframeModeler
   }
 
   def accumulate(buffer: DeltaSet[UUID], layers: Seq[Layer], keys: List[(String, String)])(t: (UUID, Array[Double])) = {
-
     val (uuid: UUID, delta: Array[Double]) = t
     layers.flatMap(l => {
       (l match {
@@ -153,7 +179,7 @@ final case class DataframeModeler
         case net: DAGNetwork =>
           net.getLayersById.asScala.filter(t => t._1 == uuid).values.headOption
       }).map(localLayer => {
-        buffer.get(localLayer.getId, localLayer.state().get(0)).addInPlace(delta)
+        buffer.get(localLayer.getId, localLayer.state().get(0)).addInPlace(delta).freeRef()
       })
     }).headOption.getOrElse(
       keys.flatMap(id => {
@@ -164,7 +190,7 @@ final case class DataframeModeler
           None
         }
       }).map(id => {
-        buffer.get(uuid, get(id._1 + "=" + id._2)).addInPlace(delta)
+        buffer.get(uuid, get(id._1 + "=" + id._2)).addInPlace(delta).freeRef()
       }).headOption.getOrElse({
         logger.info("No match found for " + uuid)
       }))
@@ -176,15 +202,24 @@ object DataframeModeler {
   val seedKey = getClass.getSimpleName.getBytes
 
   def evalFeedback(feedback: Tensor): Result => Map[UUID, Array[Double]] = (remoteResult: Result) => {
-    val deltaSet = new DeltaSet[UUID]()
-    val tensors = Array.fill(remoteResult.getData.length())(feedback)
-    remoteResult.accumulate(deltaSet, TensorArray.create(tensors: _*))
+    toMap(toDelta(remoteResult, feedback))
+  }
+
+  def toMap(deltaSet: DeltaSet[UUID]) = {
     val list = deltaSet.getMap.asScala.flatMap({
       case (layer: UUID, delta: Delta[UUID]) =>
         Option(layer -> delta.target)
     }).toList
     deltaSet.freeRef()
     list.toMap
+  }
+
+  def toDelta(remoteResult: Result, feedback: Tensor = new Tensor(1.0)) = {
+    val deltaSet = new DeltaSet[UUID]()
+    val tensorArray = TensorArray.create(Array.fill(remoteResult.getData.length())(feedback): _*)
+    remoteResult.accumulate(deltaSet, tensorArray)
+    feedback.freeRef()
+    deltaSet
   }
 
   def rawHash(str: String) = {
