@@ -25,30 +25,37 @@ import com.fasterxml.jackson.databind.{MapperFeature, ObjectMapper, Serializatio
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.simiacryptus.lang.SerializableFunction
 import com.simiacryptus.mindseye.dataframes.DataUtil._
-import com.simiacryptus.mindseye.lang.ReferenceCountingBase
-import com.simiacryptus.mindseye.layers.java.{EntropyLossLayer, FullyConnectedLayer, SoftmaxActivationLayer, SumMetaLayer}
+import com.simiacryptus.mindseye.lang.{Layer, ReferenceCountingBase}
+import com.simiacryptus.mindseye.layers.java._
 import com.simiacryptus.mindseye.network.PipelineNetwork
 import com.simiacryptus.mindseye.opt.IterativeTrainer
-import com.simiacryptus.mindseye.opt.line.QuadraticSearch
-import com.simiacryptus.mindseye.opt.orient.GradientDescent
+import com.simiacryptus.mindseye.opt.line.{BisectionSearch, LineSearchCursor, LineSearchStrategy}
+import com.simiacryptus.mindseye.opt.orient.{GradientDescent, OrientationStrategy}
 import com.simiacryptus.notebook.NotebookOutput
 import com.simiacryptus.sparkbook._
 import com.simiacryptus.sparkbook.repl.{SparkRepl, SparkSessionProvider}
 import com.simiacryptus.sparkbook.util.Java8Util._
 import com.simiacryptus.sparkbook.util.Logging
-import org.apache.spark.sql.types.{IntegerType, StringType}
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.types.IntegerType
 import org.apache.spark.storage.StorageLevel
 
 abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with Logging with SparkSessionProvider with InteractiveSetup[Object] {
 
-  override def inputTimeoutSeconds = 600
+  override def inputTimeoutSeconds = 1
 
   def dataSources: Map[String, String]
 
   def sourceTableName: String
 
-  def avoidRdd = true
+  val categories = 7
+  val featureDim = 10
+  val activationClass = classOf[ReLuActivationLayer].getCanonicalName
+  val driveClass = classOf[BisectionSearch].getCanonicalName
+  val steeringClass = classOf[GradientDescent].getCanonicalName
+  val midLayers: List[Int] = List(200, 200)
+  val trainingSchedule = List(0.005,0.01,0.01,0.05,0.05, 0.1)
+  val categoryColumnName = "Cover_Type"
 
   final def sourceDataFrame = if (spark.sqlContext.tableNames().contains(sourceTableName)) spark.sqlContext.table(sourceTableName) else null
 
@@ -60,12 +67,12 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
     .enableDefaultTyping()
 
   override def accept2(log: NotebookOutput): Object = {
-
+    implicit val _log = log
     intercept(log, classOf[ReferenceCountingBase].getCanonicalName, additive = false)
 
     log.h1("Data Staging")
     log.p("""First, we will stage the initial data and manually perform a data staging query:""")
-    val inputTables : List[DataFrame] = log.eval(() => {
+    val inputTables: List[DataFrame] = log.eval(() => {
       dataSources.map(t => {
         val (k, v) = t
         val frame = spark.sqlContext.read.parquet(k).persist(StorageLevel.DISK_ONLY)
@@ -76,14 +83,16 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
     })
     val selectStr = inputTables.head.schema.fields.map(field => {
       field.dataType match {
-        case IntegerType if("Cover_Type" == field.name) => field.name
+        case _ if field.name.startsWith("Soil_Type") => ""
+        case _ if "Cover_Type" == field.name => field.name
         case IntegerType => s"CAST(${field.name} AS DOUBLE)"
         case _ => field.name
       }
-    }).mkString(", \n\t")
+    }).filterNot(_.isEmpty).mkString(", \n\t")
 
+    implicit val sparkSession = spark
     new SparkRepl() {
-
+      override val inputTimeout = inputTimeoutSeconds
       override val defaultCmd: String =
         s"""%sql
            | CREATE TEMPORARY VIEW ${sourceTableName} AS
@@ -93,64 +102,88 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
       override def shouldContinue(): Boolean = {
         sourceDataFrame == null
       }
-
     }.apply(log)
 
-    log.p("""This sub-report can be used for concurrent adhoc data exploration:""")
-    log.subreport("explore", (sublog: NotebookOutput) => {
-      val thread = new Thread(() => {
-        new SparkRepl().apply(sublog)
-      }: Unit)
-      thread.setName("Data Exploration REPL")
-      thread.setDaemon(true)
-      thread.start()
-      null
-    })
+//    log.p("""This sub-report can be used for concurrent adhoc data exploration:""")
+//    log.subreport("explore", (sublog: NotebookOutput) => {
+//      val thread = new Thread(() => {
+//        new SparkRepl().apply(sublog)
+//      }: Unit)
+//      thread.setName("Data Exploration REPL")
+//      thread.setDaemon(true)
+//      thread.start()
+//      null
+//    })
 
-    val Array(trainingData, testingData) = sourceDataFrame.randomSplit(Array(0.1, 0.9))
-    trainingData.persist(StorageLevel.MEMORY_ONLY_SER)
+    def activation = Class.forName(activationClass).asInstanceOf[Class[Layer]].newInstance()
+
+    def drive = Class.forName(driveClass).asInstanceOf[Class[LineSearchStrategy]].newInstance()
+
+    def steering = Class.forName(steeringClass).asInstanceOf[Class[OrientationStrategy[LineSearchCursor]]].newInstance()
+
+    val strategy = new CategorizingModelingStrategy(categoryColumnName, categories, featureDim)
+    val model = DataframeModeler(strategy)
+    sourceDataFrame.persist(StorageLevel.MEMORY_ONLY_SER)
     log.h1("""Table Schema""")
     log.run(() => {
       sourceDataFrame.printSchema()
     })
 
-    val frame: DataFrame = spark.sqlContext.emptyDataFrame
-    frame.rdd.mapPartitions((iter: Iterator[Row]) => {
-      List.empty.iterator
-    })
+    val inputDim = Array(strategy.evalToDataframe(model, sourceDataFrame.drop(categoryColumnName).limit(1))("raw").rdd.collect().head.getAs[Seq[_]](0).length)
 
     val classifierNetwork = new PipelineNetwork(1)
-    classifierNetwork.add(new FullyConnectedLayer(Array(55), Array(10)))
+    val finalDim = midLayers.foldLeft(inputDim)((a, b) => {
+      classifierNetwork.add(new FullyConnectedLayer(a, Array(b)))
+      classifierNetwork.add(new BiasLayer(b))
+      classifierNetwork.add(activation)
+      Array(b)
+    })
+    classifierNetwork.add(new FullyConnectedLayer(finalDim, Array(categories)))
+    classifierNetwork.add(new BiasLayer(categories))
     classifierNetwork.add(new SoftmaxActivationLayer())
+
     val lossNetwork = new PipelineNetwork(2)
-    lossNetwork.add(new SumMetaLayer(),
+    lossNetwork.add(classifierNetwork)
+    lossNetwork.add(new MaxConstLayer().setMaxValue(0.9))
+    lossNetwork.add(new AvgMetaLayer(),
       lossNetwork.add(new EntropyLossLayer(),
-        lossNetwork.add(classifierNetwork, lossNetwork.getInput(0)),
+        lossNetwork.getHead,
         lossNetwork.getInput(1))
     )
-    val model = DataframeModeler(size = (self, value) => {
-      if (self.path == "Cover_Type") List(10)
-      else List(1)
-    })
 
-    withMonitor(log) { trainingMonitor => {
-      log.eval(() => {
-        new IterativeTrainer(model.asTrainable(isLocal = avoidRdd)(
-          trainingData.drop("Cover_Type"),
-          trainingData.select("Cover_Type")
-        )(
-          lossNetwork
-        ))
-          .setMonitor(trainingMonitor)
-          .setOrientation(new GradientDescent)
-          .setLineSearchFactory((name: CharSequence) => new QuadraticSearch)
-          .setTimeout(30, TimeUnit.MINUTES)
-          .setMaxIterations(100)
-          .runAndFree
-          .toString
-      })
+    val Array(trainingData, testingData) = sourceDataFrame.randomSplit(Array(0.9, 0.1))
+    trainingData.cache()
+    for (trainingBatch <- trainingSchedule.map(f => trainingData.sample(f).repartition(Math.max((trainingData.count() * f / 10000).toInt, 2)))) {
+      withMonitor(log) { trainingMonitor => {
+        trainingBatch.persist(StorageLevel.MEMORY_ONLY_SER)
+        log.eval(() => {
+          new IterativeTrainer(model.asTrainable(
+            trainingBatch.drop(categoryColumnName),
+            trainingBatch.select(categoryColumnName)
+          )(
+            lossNetwork
+          ))
+            .setMonitor(trainingMonitor)
+            .setOrientation(steering)
+            .setLineSearchFactory((_: CharSequence) => drive)
+            .setTimeout(30, TimeUnit.MINUTES)
+            .setMaxIterations(10)
+            .runAndFree
+            .toString
+        })
+        trainingBatch.unpersist()
+      }
+      }
     }
-    }
+
+    val testingData2 = testingData.limit(100)
+    SparkRepl.out(DataframeModeler.zip(
+      testingData2.select(categoryColumnName),
+      testingData2.drop(categoryColumnName),
+      model.evalToDataframe(testingData2.drop(categoryColumnName))("Prediction", classifierNetwork)
+    ).cache())
+
+    null
   }
 
 
