@@ -7,7 +7,7 @@ import com.google.common.hash.Hashing
 import com.google.gson.JsonObject
 import com.simiacryptus.mindseye.eval.ArrayTrainable
 import com.simiacryptus.mindseye.lang._
-import com.simiacryptus.mindseye.layers.java.ValueLayer
+import com.simiacryptus.mindseye.layers.ValueLayer
 import com.simiacryptus.mindseye.network.DAGNetwork
 import com.simiacryptus.sparkbook.util.Java8Util._
 import com.simiacryptus.sparkbook.util.Logging
