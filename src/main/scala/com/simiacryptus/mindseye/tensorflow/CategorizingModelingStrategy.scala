@@ -1,4 +1,4 @@
-package com.simiacryptus.mindseye.dataframes
+package com.simiacryptus.mindseye.tensorflow
 
 import java.util.UUID
 

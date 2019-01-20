@@ -1,4 +1,4 @@
-package com.simiacryptus.mindseye.dataframes
+package com.simiacryptus.mindseye.tensorflow
 
 /*
  * Copyright (c) 2018 by Andrew Charneski.
@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 import com.fasterxml.jackson.databind.{MapperFeature, ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.simiacryptus.lang.SerializableFunction
-import com.simiacryptus.mindseye.dataframes.DataUtil._
+import com.simiacryptus.mindseye.tensorflow.DataUtil._
 import com.simiacryptus.mindseye.lang.{Layer, ReferenceCountingBase}
 import com.simiacryptus.mindseye.layers.java._
 import com.simiacryptus.mindseye.network.PipelineNetwork

@@ -1,4 +1,4 @@
-package com.simiacryptus.mindseye.dataframes
+package com.simiacryptus.mindseye.tensorflow
 
 import java.io.{File, IOException, OutputStream, PrintWriter}
 import java.text.SimpleDateFormat

@@ -1,10 +1,10 @@
-package com.simiacryptus.mindseye.dataframes
+package com.simiacryptus.mindseye.tensorflow
 
 import java.util.function.BiConsumer
 import java.util.{Random, UUID}
 
 import com.google.gson.{GsonBuilder, JsonObject}
-import com.simiacryptus.mindseye.dataframes.DataframeModeler.{evalFeedback, zip}
+import com.simiacryptus.mindseye.tensorflow.DataframeModeler.{evalFeedback, zip}
 import com.simiacryptus.mindseye.lang._
 import com.simiacryptus.mindseye.layers.java._
 import com.simiacryptus.mindseye.network.PipelineNetwork

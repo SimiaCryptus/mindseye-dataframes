@@ -1,4 +1,4 @@
-package com.simiacryptus.mindseye.dataframes
+package com.simiacryptus.mindseye.tensorflow
 
 import com.simiacryptus.aws.exe.EC2NodeSettings
 import com.simiacryptus.sparkbook.{AWSNotebookRunner, EC2SparkRunner}
