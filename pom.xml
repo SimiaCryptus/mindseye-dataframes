@@ -1,5 +1,5 @@
 <!--
-  ~ Copyright (c) 2018 by Andrew Charneski.
+  ~ Copyright (c) 2019 by Andrew Charneski.
   ~
   ~ The author licenses this file to you under the
   ~ Apache License, Version 2.0 (the "License");
@@ -24,7 +24,7 @@
     <parent>
         <groupId>com.simiacryptus</groupId>
         <artifactId>scala-parent</artifactId>
-        <version>1.5.1</version>
+        <version>1.6.0</version>
         <relativePath>../scala-parent</relativePath>
     </parent>
 
@@ -116,22 +116,22 @@
         <dependency>
             <groupId>com.simiacryptus</groupId>
             <artifactId>mindseye-core</artifactId>
-            <version>1.5.1</version>
+            <version>1.6.0</version>
         </dependency>
         <dependency>
             <groupId>com.simiacryptus</groupId>
             <artifactId>mindseye-cudnn</artifactId>
-            <version>1.5.1</version>
+            <version>1.6.0</version>
         </dependency>
         <dependency>
             <groupId>com.simiacryptus</groupId>
             <artifactId>mindseye-aparapi</artifactId>
-            <version>1.5.1</version>
+            <version>1.6.0</version>
         </dependency>
         <dependency>
             <groupId>com.simiacryptus</groupId>
             <artifactId>mindseye-research</artifactId>
-            <version>1.5.1</version>
+            <version>1.6.0</version>
         </dependency>
         <dependency>
             <groupId>com.simiacryptus</groupId>
