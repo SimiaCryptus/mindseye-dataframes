@@ -23,14 +23,13 @@ import java.util.function.BiConsumer
 import java.util.{Random, UUID}
 
 import com.google.gson.{GsonBuilder, JsonObject}
-import com.simiacryptus.mindseye.tensorflow.DataframeModeler.{evalFeedback, zip}
 import com.simiacryptus.mindseye.lang._
 import com.simiacryptus.mindseye.layers.java._
 import com.simiacryptus.mindseye.network.PipelineNetwork
+import com.simiacryptus.mindseye.tensorflow.DataframeModeler.{evalFeedback, zip}
 import com.simiacryptus.sparkbook.util.Java8Util._
 import com.simiacryptus.sparkbook.util.Logging
 import com.simiacryptus.util.ArrayUtil
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{ArrayType, DoubleType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 

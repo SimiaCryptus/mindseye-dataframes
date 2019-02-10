@@ -21,12 +21,12 @@ package com.simiacryptus.mindseye.tensorflow
 
 import java.io.{File, IOException, OutputStream, PrintWriter}
 import java.text.SimpleDateFormat
-import java.util.{Date, UUID}
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.BiConsumer
+import java.util.{Date, UUID}
 
-import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.core.AppenderBase
 import com.simiacryptus.mindseye.lang._
 import com.simiacryptus.mindseye.opt.{Step, TrainingMonitor}
@@ -38,10 +38,9 @@ import com.simiacryptus.util.Util
 import javax.imageio.ImageIO
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.duration.Duration
-import scala.concurrent.duration._
 import scala.collection.JavaConversions._
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration.{Duration, _}
 object DataUtil extends Logging {
 
   private def now: Long = System.currentTimeMillis()

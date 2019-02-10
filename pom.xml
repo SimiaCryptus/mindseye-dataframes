@@ -85,22 +85,6 @@
             <artifactId>log4j-over-slf4j</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-ec2</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-s3</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-iam</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-ses</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-aws</artifactId>
         </dependency>
@@ -116,26 +100,12 @@
         <dependency>
             <groupId>com.simiacryptus</groupId>
             <artifactId>mindseye-core</artifactId>
-            <version>1.6.0</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.simiacryptus</groupId>
-            <artifactId>mindseye-cudnn</artifactId>
-            <version>1.6.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.simiacryptus</groupId>
-            <artifactId>mindseye-aparapi</artifactId>
-            <version>1.6.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.simiacryptus</groupId>
-            <artifactId>mindseye-research</artifactId>
-            <version>1.6.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.simiacryptus</groupId>
-            <artifactId>mindseye-art</artifactId>
+            <artifactId>mindseye-java</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.simiacryptus</groupId>
@@ -171,49 +141,16 @@
             <artifactId>commons-io</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.github.wendykierp</groupId>
-            <artifactId>JTransforms</artifactId>
-            <classifier>with-dependencies</classifier>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.github.haifengl</groupId>
-            <artifactId>smile-plot</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.github.haifengl</groupId>
-            <artifactId>smile-scala_${scala.mjversion}</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>guru.nidi</groupId>
-            <artifactId>graphviz-java</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.github.haifengl</groupId>
             <artifactId>smile-math</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.nanohttpd</groupId>
-            <artifactId>nanohttpd</artifactId>
-            <optional>true</optional>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-core_${scala.mjversion}</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_2.11</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_2.11</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco.javacpp-presets</groupId>
-            <artifactId>hdf5-platform</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco.javacpp-presets</groupId>
-            <artifactId>hdf5</artifactId>
-            <optional>true</optional>
+            <artifactId>spark-sql_${scala.mjversion}</artifactId>
         </dependency>
     </dependencies>
 

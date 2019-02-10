@@ -19,8 +19,6 @@
 
 package com.simiacryptus.mindseye.tensorflow
 
-import org.apache.spark.sql.types.StructType
-
 abstract class CovType_Trainer extends Trainer {
 
   override val dataSources = Map(

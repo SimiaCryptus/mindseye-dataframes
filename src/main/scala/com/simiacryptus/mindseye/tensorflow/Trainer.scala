@@ -43,13 +43,13 @@ import java.util.concurrent.TimeUnit
 import com.fasterxml.jackson.databind.{MapperFeature, ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.simiacryptus.lang.SerializableFunction
-import com.simiacryptus.mindseye.tensorflow.DataUtil._
 import com.simiacryptus.mindseye.lang.{Layer, ReferenceCountingBase}
 import com.simiacryptus.mindseye.layers.java._
 import com.simiacryptus.mindseye.network.PipelineNetwork
 import com.simiacryptus.mindseye.opt.IterativeTrainer
 import com.simiacryptus.mindseye.opt.line.{BisectionSearch, LineSearchCursor, LineSearchStrategy}
 import com.simiacryptus.mindseye.opt.orient.{GradientDescent, OrientationStrategy}
+import com.simiacryptus.mindseye.tensorflow.DataUtil._
 import com.simiacryptus.notebook.NotebookOutput
 import com.simiacryptus.sparkbook._
 import com.simiacryptus.sparkbook.repl.{SparkRepl, SparkSessionProvider}
