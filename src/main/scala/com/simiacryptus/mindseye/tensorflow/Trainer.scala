@@ -159,7 +159,7 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
     })
     classifierNetwork.add(new FullyConnectedLayer(finalDim, Array(categories)))
     classifierNetwork.add(new BiasLayer(categories))
-    classifierNetwork.add(new SoftmaxActivationLayer())
+    classifierNetwork.add(new SoftmaxLayer())
 
     val lossNetwork = new PipelineNetwork(2)
     lossNetwork.add(classifierNetwork)
