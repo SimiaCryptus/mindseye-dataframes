@@ -24,24 +24,23 @@
     <parent>
         <groupId>com.simiacryptus</groupId>
         <artifactId>scala-parent</artifactId>
-        <version>1.6.0</version>
+        <version>1.6.1</version>
         <relativePath>../scala-parent</relativePath>
     </parent>
 
     <artifactId>mindseye-dataframes</artifactId>
     <description>Model Training from Spark Dataframes</description>
-    <url>https://simiacryptus.github.io/${github.project}/${github.path}</url>
+    <url>https://simiacryptus.github.io/${github.project}/</url>
 
     <properties>
         <github.project>mindseye-dataframes</github.project>
-        <github.path></github.path>
         <scala.mjversion>2.11</scala.mjversion>
         <scala.version>2.11.11</scala.version>
     </properties>
     <distributionManagement>
         <site>
             <id>github</id>
-            <url>https://simiacryptus.github.io/${github.project}/${github.path}</url>
+            <url>https://simiacryptus.github.io/${github.project}/</url>
         </site>
     </distributionManagement>
 
