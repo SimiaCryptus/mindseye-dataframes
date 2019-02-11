@@ -29,7 +29,7 @@
     </parent>
 
     <artifactId>mindseye-dataframes</artifactId>
-    <description>Experiments with Image Analysis</description>
+    <description>Model Training from Spark Dataframes</description>
 
     <properties>
         <github.project>mindseye-dataframes</github.project>
