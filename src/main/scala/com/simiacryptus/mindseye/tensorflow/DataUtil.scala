@@ -28,6 +28,7 @@ import java.util.{Date, UUID}
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.core.AppenderBase
+import com.simiacryptus.lang.ref.{ReferenceCounting, ReferenceCountingBase}
 import com.simiacryptus.mindseye.lang._
 import com.simiacryptus.mindseye.opt.{Step, TrainingMonitor}
 import com.simiacryptus.mindseye.test.{StepRecord, TestUtil}
@@ -181,6 +182,8 @@ object DataUtil extends Logging {
         aData.stream().skip(offset).limit(selectionLength)
       }
 
+      override def addRef(): TensorList = super.addRef().asInstanceOf[TensorList]
+
       override protected def _free(): Unit = {
         aData.freeRef()
         super._free()
@@ -207,6 +210,8 @@ object DataUtil extends Logging {
       override def getDimensions: Array[Int] = aData.getDimensions
 
       override def length(): Int = aLength + bLength
+
+      override def addRef(): TensorList = super.addRef().asInstanceOf[TensorList]
 
       override def stream(): java.util.stream.Stream[Tensor] = java.util.stream.Stream.concat(
         aData.stream(),

@@ -43,7 +43,8 @@ import java.util.concurrent.TimeUnit
 import com.fasterxml.jackson.databind.{MapperFeature, ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.simiacryptus.lang.SerializableFunction
-import com.simiacryptus.mindseye.lang.{Layer, ReferenceCountingBase}
+import com.simiacryptus.lang.ref.ReferenceCountingBase
+import com.simiacryptus.mindseye.lang.Layer
 import com.simiacryptus.mindseye.layers.java._
 import com.simiacryptus.mindseye.network.PipelineNetwork
 import com.simiacryptus.mindseye.opt.IterativeTrainer
@@ -85,7 +86,7 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
     .registerModule(DefaultScalaModule)
     .enableDefaultTyping()
 
-  override def accept2(log: NotebookOutput): Object = {
+  override def postConfigure(log: NotebookOutput): Object = {
     implicit val _log = log
     intercept(log, classOf[ReferenceCountingBase].getCanonicalName, additive = false)
 
@@ -163,7 +164,7 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
 
     val lossNetwork = new PipelineNetwork(2)
     lossNetwork.add(classifierNetwork)
-    lossNetwork.add(new MaxConstLayer().setMaxValue(0.9))
+    lossNetwork.add(new BoundedActivationLayer().setMaxValue(0.9))
     lossNetwork.add(new AvgMetaLayer(),
       lossNetwork.add(new EntropyLossLayer(),
         lossNetwork.getHead,
