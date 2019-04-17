@@ -62,22 +62,18 @@ import org.apache.spark.storage.StorageLevel
 
 abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with Logging with SparkSessionProvider with InteractiveSetup[Object] {
 
-  override def inputTimeoutSeconds = 1
-
-  def dataSources: Map[String, String]
-
-  def sourceTableName: String
-
   val categories = 7
   val featureDim = 10
   val activationClass = classOf[ReLuActivationLayer].getCanonicalName
   val driveClass = classOf[BisectionSearch].getCanonicalName
   val steeringClass = classOf[GradientDescent].getCanonicalName
   val midLayers: List[Int] = List(200, 200)
-  val trainingSchedule = List(0.005,0.01,0.01,0.05,0.05, 0.1)
+  val trainingSchedule = List(0.005, 0.01, 0.01, 0.05, 0.05, 0.1)
   val categoryColumnName = "Cover_Type"
 
-  final def sourceDataFrame = if (spark.sqlContext.tableNames().contains(sourceTableName)) spark.sqlContext.table(sourceTableName) else null
+  def dataSources: Map[String, String]
+
+  def sourceTableName: String
 
   def objectMapper = new ObjectMapper()
     .enable(SerializationFeature.INDENT_OUTPUT)
@@ -124,16 +120,16 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
       }
     }.apply(log)
 
-//    log.p("""This sub-report can be used for concurrent adhoc data exploration:""")
-//    log.subreport("explore", (sublog: NotebookOutput) => {
-//      val thread = new Thread(() => {
-//        new SparkRepl().apply(sublog)
-//      }: Unit)
-//      thread.setName("Data Exploration REPL")
-//      thread.setDaemon(true)
-//      thread.start()
-//      null
-//    })
+    //    log.p("""This sub-report can be used for concurrent adhoc data exploration:""")
+    //    log.subreport("explore", (sublog: NotebookOutput) => {
+    //      val thread = new Thread(() => {
+    //        new SparkRepl().apply(sublog)
+    //      }: Unit)
+    //      thread.setName("Data Exploration REPL")
+    //      thread.setDaemon(true)
+    //      thread.start()
+    //      null
+    //    })
 
     def activation = Class.forName(activationClass).asInstanceOf[Class[Layer]].newInstance()
 
@@ -205,6 +201,10 @@ abstract class Trainer extends SerializableFunction[NotebookOutput, Object] with
 
     null
   }
+
+  override def inputTimeoutSeconds = 1
+
+  final def sourceDataFrame = if (spark.sqlContext.tableNames().contains(sourceTableName)) spark.sqlContext.table(sourceTableName) else null
 
 
 }

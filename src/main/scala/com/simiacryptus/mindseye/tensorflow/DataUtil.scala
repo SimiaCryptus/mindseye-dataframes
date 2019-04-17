@@ -28,7 +28,7 @@ import java.util.{Date, UUID}
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.core.AppenderBase
-import com.simiacryptus.lang.ref.{ReferenceCounting, ReferenceCountingBase}
+import com.simiacryptus.lang.ref.ReferenceCountingBase
 import com.simiacryptus.mindseye.lang._
 import com.simiacryptus.mindseye.opt.{Step, TrainingMonitor}
 import com.simiacryptus.mindseye.test.{StepRecord, TestUtil}
@@ -42,23 +42,18 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.{Duration, _}
+
 object DataUtil extends Logging {
 
-  private def now: Long = System.currentTimeMillis()
-  private case class LogWriterState
-  (
-    file: PrintWriter,
-    time: Long = now,
-    counter: AtomicInteger = new AtomicInteger(0)
-  )
   def intercept(log: NotebookOutput, loggerName: String, maxSize: Int = 1000000, maxDuration: Duration = 1 hour, level: Level = Level.ALL, additive: Boolean = true): Unit = {
 
-    log.subreport("log_" + loggerName, (sublog:NotebookOutput) => {
+    log.subreport("log_" + loggerName, (sublog: NotebookOutput) => {
       def newOut = {
         val name = loggerName + "_" + new SimpleDateFormat("dd_HH_mm").format(new Date) + ".log"
         sublog.out(sublog.link(new File(sublog.getResourceDir, name), name))
         new PrintWriter(sublog.file(name))
       }
+
       val logger = LoggerFactory.getLogger(loggerName).asInstanceOf[Logger]
       logger.setLevel(level)
       logger.setAdditive(additive)
@@ -87,6 +82,7 @@ object DataUtil extends Logging {
     })
   }
 
+  private def now: Long = System.currentTimeMillis()
 
   def withMonitor[T](log: NotebookOutput)(fn: TrainingMonitor => T) = {
 
@@ -125,43 +121,19 @@ object DataUtil extends Logging {
       }
     }
   }
-  class ConcatResult(val children: Result*) extends Result(
-    children.map(_.getData).reduce(concatTensorList(_,_)),
-    new BiConsumer[DeltaSet[UUID], TensorList] {
-      override def accept(buffer: DeltaSet[UUID], signal: TensorList): Unit = {
-        children.foldLeft(0)((l,b)=>{
-          val n = b.getData.length()
-          b.accumulate(buffer, selectTensorList(signal, l, n))
-          n+l
-        })
-      }
-    }) {
-//    val childData = children.map(x=>{
-//      val data = x.getData
-//      data.addRef()
-//      data
-//    })
-
-    override protected def _free(): Unit = {
-//      childData.foreach(_.freeRef())
-      children.foreach(_.freeRef())
-      super._free()
-    }
-
-  }
 
   def concatAndFree(a: Result, b: Result): Result = {
-    (a,b) match {
+    (a, b) match {
       case (a: ConcatResult, b: ConcatResult) => {
         a.children.foreach(_.addRef())
         b.children.foreach(_.addRef())
-        val concatResult = new ConcatResult((a.children ++ b.children):_*)
+        val concatResult = new ConcatResult((a.children ++ b.children): _*)
         a.freeRef()
         b.freeRef()
         concatResult
       }
       case (a: Result, b: Result) =>
-        new ConcatResult(a,b)
+        new ConcatResult(a, b)
     }
   }
 
@@ -190,7 +162,6 @@ object DataUtil extends Logging {
       }
     }
   }
-
 
   def concatTensorList(aData: TensorList, bData: TensorList): TensorList = {
     new ReferenceCountingBase with TensorList {
@@ -225,4 +196,36 @@ object DataUtil extends Logging {
       }
     }
   }
+
+  class ConcatResult(val children: Result*) extends Result(
+    children.map(_.getData).reduce(concatTensorList(_, _)),
+    new BiConsumer[DeltaSet[UUID], TensorList] {
+      override def accept(buffer: DeltaSet[UUID], signal: TensorList): Unit = {
+        children.foldLeft(0)((l, b) => {
+          val n = b.getData.length()
+          b.accumulate(buffer, selectTensorList(signal, l, n))
+          n + l
+        })
+      }
+    }) {
+    //    val childData = children.map(x=>{
+    //      val data = x.getData
+    //      data.addRef()
+    //      data
+    //    })
+
+    override protected def _free(): Unit = {
+      //      childData.foreach(_.freeRef())
+      children.foreach(_.freeRef())
+      super._free()
+    }
+
+  }
+
+  private case class LogWriterState
+  (
+    file: PrintWriter,
+    time: Long = now,
+    counter: AtomicInteger = new AtomicInteger(0)
+  )
 }

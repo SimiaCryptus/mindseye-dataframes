@@ -23,12 +23,10 @@ import com.simiacryptus.sparkbook.{EmbeddedSparkRunner, NotebookRunner}
 
 object CovType_Trainer_Embedded extends CovType_Trainer with EmbeddedSparkRunner[Object] with NotebookRunner[Object] {
 
-  override def hiveRoot: Option[String] = None
-
   override protected val s3bucket: String = envTuple._2
-
   override val numberOfWorkersPerNode: Int = 2
-
   override val workerMemory: String = "2g"
+
+  override def hiveRoot: Option[String] = None
 
 }

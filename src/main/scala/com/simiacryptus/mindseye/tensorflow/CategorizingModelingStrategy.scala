@@ -23,7 +23,7 @@ import java.util.UUID
 
 import com.simiacryptus.mindseye.lang.{Layer, Tensor}
 
-class CategorizingModelingStrategy(categoryColumnName: String, categories:Int, val defaultSize: Int*) extends RDDModelingStrategy(defaultSize: _*) {
+class CategorizingModelingStrategy(categoryColumnName: String, categories: Int, val defaultSize: Int*) extends RDDModelingStrategy(defaultSize: _*) {
   override def initialRepresentation(value: String): Tensor = {
     if (value.startsWith(categoryColumnName)) {
       require(null != value)

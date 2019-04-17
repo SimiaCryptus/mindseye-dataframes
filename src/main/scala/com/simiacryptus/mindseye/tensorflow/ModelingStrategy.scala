@@ -56,16 +56,6 @@ abstract class ModelingStrategy
     initData
   }
 
-  def hash(value: String) = {
-    DataframeModeler.rawHash(value)
-  }
-
-  def changeId[T <: Layer](in: T, id: UUID): T = {
-    val newLayer = Layer.fromJson(new GsonBuilder().create().fromJson(in.getJson.toString.replaceAll(in.getId.toString, id.toString), classOf[JsonObject])).asInstanceOf[T]
-    in.freeRef()
-    newLayer
-  }
-
   def initialTransform(path: String, stats: => (Double, Double, Double)) = {
     val id = UUID.nameUUIDFromBytes(path.getBytes("UTF-8"))
     val hashCode = hash(path)
@@ -77,6 +67,16 @@ abstract class ModelingStrategy
     pipelineNetwork.add(changeId(new FullyConnectedLayer(Array(mappingPower), Array(size(path): _*)), id))
     logger.debug(s"Initialize value for ${path}($id) = $pipelineNetwork")
     pipelineNetwork
+  }
+
+  def hash(value: String) = {
+    DataframeModeler.rawHash(value)
+  }
+
+  def changeId[T <: Layer](in: T, id: UUID): T = {
+    val newLayer = Layer.fromJson(new GsonBuilder().create().fromJson(in.getJson.toString.replaceAll(in.getId.toString, id.toString), classOf[JsonObject])).asInstanceOf[T]
+    in.freeRef()
+    newLayer
   }
 
   def size(path: String): Seq[Int] = defaultSize
@@ -93,7 +93,7 @@ abstract class ModelingStrategy
   def eval(ctx: DataframeModeler, dataFrames: DataFrame*)(layers: Layer*)(implicit sparkSession: SparkSession): Result
 }
 
-class LocalModelingStrategy(defaultSize: Int*) extends ModelingStrategy(defaultSize:_*) {
+class LocalModelingStrategy(defaultSize: Int*) extends ModelingStrategy(defaultSize: _*) {
   override def evalToDataframe(ctx: DataframeModeler, dataFrames: DataFrame*)(name: String, layers: Layer*)(implicit sparkSession: SparkSession): DataFrame = {
     val (representationKeys, transformKeys) = ctx.initKeys(dataFrames: _*)
     val schema = dataFrames.map(_.schema).toArray
@@ -163,7 +163,7 @@ class LocalModelingStrategy(defaultSize: Int*) extends ModelingStrategy(defaultS
 
 }
 
-class RDDModelingStrategy(defaultSize: Int*) extends ModelingStrategy(defaultSize:_*) {
+class RDDModelingStrategy(defaultSize: Int*) extends ModelingStrategy(defaultSize: _*) {
   override def evalToDataframe(ctx: DataframeModeler, dataFrames: DataFrame*)(name: String, layers: Layer*)(implicit sparkSession: SparkSession): DataFrame = {
     val (representationKeys, transformKeys) = ctx.initKeys(dataFrames: _*)
     val schema = dataFrames.map(_.schema).toArray
@@ -188,11 +188,13 @@ class RDDModelingStrategy(defaultSize: Int*) extends ModelingStrategy(defaultSiz
   override def eval(ctx: DataframeModeler, dataFrames: DataFrame*)(layers: Layer*)(implicit sparkSession: SparkSession): Result = {
     val (representationKeys, transformKeys) = ctx.initKeys(dataFrames: _*)
     val unitFeedback = new Tensor(1.0)
-    def sum(tensorList: TensorList): Tensor = (0 until tensorList.length()).map(tensorList.get(_)).reduce((a,b)=>{
+
+    def sum(tensorList: TensorList): Tensor = (0 until tensorList.length()).map(tensorList.get(_)).reduce((a, b) => {
       val r = a.addAndFree(b)
       b.freeRef()
       r
     })
+
     val ctxBroadcast = sparkSession.sparkContext.broadcast(ctx)
     val (results, uuidToDoubles) = {
       val schema = (0 until dataFrames.size).map(i => {
@@ -210,7 +212,7 @@ class RDDModelingStrategy(defaultSize: Int*) extends ModelingStrategy(defaultSiz
         tuple._1.detach()
         List(tuple).iterator
       })
-    }.reduce((a,b)=>{
+    }.reduce((a, b) => {
       val (tensor1, map1) = a
       val (tensor2, map2) = b
       val tuple = List(tensor1, tensor2).reduce((a, b) => {

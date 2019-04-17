@@ -45,16 +45,11 @@ final case class DataframeModeler
 ) extends Logging {
 
 
-  def evalToDataframe(dataFrames: DataFrame*)(name: String, layers: Layer*)(implicit sparkSession: SparkSession): DataFrame = strategy.evalToDataframe(this,dataFrames:_*)(name,layers:_*)
+  def evalToDataframe(dataFrames: DataFrame*)(name: String, layers: Layer*)(implicit sparkSession: SparkSession): DataFrame = strategy.evalToDataframe(this, dataFrames: _*)(name, layers: _*)
 
-  def eval(dataFrames: DataFrame*)(layers: Layer*)(implicit sparkSession: SparkSession): Result = strategy.eval(this,dataFrames:_*)(layers:_*)
+  def eval(dataFrames: DataFrame*)(layers: Layer*)(implicit sparkSession: SparkSession): Result = strategy.eval(this, dataFrames: _*)(layers: _*)
 
   def child(name: String): DataframeModeler = copy(path = List(path, name).filterNot(_.isEmpty).mkString("/"))
-
-  private def valueStr(value: Any) = {
-    require(null != value)
-    this.path + "=" + value
-  }
 
   def getRepresentation(key: String) = {
     require(null != key)
@@ -185,9 +180,11 @@ final case class DataframeModeler
   def print(uuidToDoubles: Map[UUID, Array[Double]], layers: Seq[Layer], keys: Seq[String], transformKeys: Seq[String], header: String) = {
     uuidToDoubles.foreach(t => {
       def uuid = t._1
+
       def name = findLayer(layers, uuid).map(_.getName)
         .orElse(uuidMap(keys ++ transformKeys).get(uuid))
         .getOrElse("???")
+
       logger.debug(s"$header Delta: $uuid -> $name = ${t._2.mkString(",")}")
     })
   }
@@ -216,6 +213,11 @@ final case class DataframeModeler
   def uuidMap(keys: Seq[String]): Map[UUID, String] = {
     keys.map(id => UUID.nameUUIDFromBytes((id).getBytes("UTF-8")) -> id).toMap
   }
+
+  private def valueStr(value: Any) = {
+    require(null != value)
+    this.path + "=" + value
+  }
 }
 
 object DataframeModeler {
@@ -223,20 +225,6 @@ object DataframeModeler {
 
   def evalFeedback(feedback: Tensor): Result => Map[UUID, Array[Double]] = (remoteResult: Result) => {
     toMap(toDelta(remoteResult, feedback))
-  }
-
-  def zip(o: DataFrame*)(implicit sparkSession: SparkSession): DataFrame = {
-    val rows = zip(o.map(_.rdd): _*).map(t => Row(t.map(_.toSeq).reduce(_ ++ _): _*))
-    val schema = StructType(o.map(_.schema.toSeq).reduce(_ ++ _))
-    sparkSession.createDataFrame(rows, schema)
-  }
-
-  def zip[T: ClassTag](o: RDD[T]*): RDD[Seq[T]] = {
-    def fn[U: ClassTag](x: RDD[U]): RDD[(Long, U)] = x.zipWithIndex().map(x => x._2 -> x._1)
-
-    o.map(_.map(Seq(_))).reduce((a, b) => {
-      fn(a).join(fn(b)).map(_._2).map((x) => x._1 ++ x._2)
-    })
   }
 
   def toMap(deltaSet: DeltaSet[UUID]) = {
@@ -253,6 +241,20 @@ object DataframeModeler {
     val tensorArray = TensorArray.create(Array.fill(remoteResult.getData.length())(feedback): _*)
     remoteResult.accumulate(deltaSet, tensorArray)
     deltaSet
+  }
+
+  def zip(o: DataFrame*)(implicit sparkSession: SparkSession): DataFrame = {
+    val rows = zip(o.map(_.rdd): _*).map(t => Row(t.map(_.toSeq).reduce(_ ++ _): _*))
+    val schema = StructType(o.map(_.schema.toSeq).reduce(_ ++ _))
+    sparkSession.createDataFrame(rows, schema)
+  }
+
+  def zip[T: ClassTag](o: RDD[T]*): RDD[Seq[T]] = {
+    def fn[U: ClassTag](x: RDD[U]): RDD[(Long, U)] = x.zipWithIndex().map(x => x._2 -> x._1)
+
+    o.map(_.map(Seq(_))).reduce((a, b) => {
+      fn(a).join(fn(b)).map(_._2).map((x) => x._1 ++ x._2)
+    })
   }
 
   def rawHash(str: String) = {
