@@ -228,4 +228,5 @@ object DataUtil extends Logging {
     time: Long = now,
     counter: AtomicInteger = new AtomicInteger(0)
   )
+
 }
