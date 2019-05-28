@@ -56,12 +56,6 @@ abstract class ModelingStrategy
     initData
   }
 
-  def hash(value: String) = {
-    DataframeModeler.rawHash(value)
-  }
-
-  def size(path: String): Seq[Int] = defaultSize
-
   def initialTransform(path: String, stats: => (Double, Double, Double)) = {
     val id = UUID.nameUUIDFromBytes(path.getBytes("UTF-8"))
     val hashCode = hash(path)
@@ -74,6 +68,12 @@ abstract class ModelingStrategy
     logger.debug(s"Initialize value for ${path}($id) = $pipelineNetwork")
     pipelineNetwork
   }
+
+  def hash(value: String) = {
+    DataframeModeler.rawHash(value)
+  }
+
+  def size(path: String): Seq[Int] = defaultSize
 
   def changeId[T <: Layer](in: T, id: UUID): T = {
     val newLayer = Layer.fromJson(new GsonBuilder().create().fromJson(in.getJson.toString.replaceAll(in.getId.toString, id.toString), classOf[JsonObject])).asInstanceOf[T]
