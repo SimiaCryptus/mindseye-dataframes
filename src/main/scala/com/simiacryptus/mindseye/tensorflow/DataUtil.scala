@@ -28,11 +28,11 @@ import java.util.{Date, UUID}
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.core.AppenderBase
-import com.simiacryptus.lang.ref.ReferenceCountingBase
 import com.simiacryptus.mindseye.lang._
 import com.simiacryptus.mindseye.opt.{Step, TrainingMonitor}
 import com.simiacryptus.mindseye.test.{StepRecord, TestUtil}
 import com.simiacryptus.notebook.{MarkdownNotebookOutput, NotebookOutput}
+import com.simiacryptus.ref.lang.ReferenceCountingBase
 import com.simiacryptus.sparkbook.util.Java8Util._
 import com.simiacryptus.sparkbook.util.Logging
 import com.simiacryptus.util.Util
